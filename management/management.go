@@ -21,7 +21,7 @@ func init() {
 	r := mux.NewRouter()
 	r.HandleFunc("/services/", getServices).Methods("GET")
 	r.HandleFunc("/services/", postServices).Methods("POST")
-	r.HandleFunc("/services/{category}", deleteService).Methods("DELETE")
+	r.HandleFunc("/services/{stack}/{service}", deleteService).Methods("DELETE")
 
 	server = &http.Server{Addr: ":10512"}
 	server.Handler = r
@@ -69,7 +69,7 @@ func getServices(w http.ResponseWriter, r *http.Request) {
 
 func deleteService(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	identifier := vars["identifier"]
+	identifier := vars["stack"] + "/" + vars["service"]
 
 	srvMutex.Lock()
 	if srv, ok := srvMap[identifier]; ok {
@@ -100,6 +100,6 @@ func postServices(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 500)
 	}
 	srvMutex.Lock()
-	srvMap[service.identifier] = service
+	srvMap[srvCreationRequest.StackName+"/"+srvCreationRequest.ServiceName] = service
 	srvMutex.Unlock()
 }

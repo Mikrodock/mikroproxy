@@ -33,7 +33,7 @@ type ServiceCreationRequest struct {
 	InternalPort int    `json:"internal_port"`
 }
 
-func (s *Service) doDNS() string {
+func (s *Service) doDNS() (string, error) {
 	c := dns.Client{}
 	m := dns.Msg{}
 	m.SetQuestion(s.lookup+".", dns.TypeA)
@@ -50,14 +50,16 @@ func (s *Service) doDNS() string {
 	}
 
 	if err != nil {
-		log.Fatal(err)
+		log.Println("Cannot connect to DNS")
+		return "", err
 	}
 
 	if len(r.Answer) == 0 {
-		log.Fatal("No results")
+		log.Println("No results")
+		return "", err
 	}
 	Arecord := r.Answer[0].(*dns.A)
-	return Arecord.A.String()
+	return Arecord.A.String(), nil
 }
 
 func (s *Service) Start(wg *sync.WaitGroup) {
@@ -88,7 +90,11 @@ func (s *Service) Start(wg *sync.WaitGroup) {
 
 func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
-	ip := s.doDNS()
+	ip, err := s.doDNS()
+
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+	}
 
 	uri := fmt.Sprintf(s.preparedURI, ip) + r.RequestURI
 
@@ -114,7 +120,7 @@ func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	resp, err := transport.RoundTrip(rr)
 	if err != nil {
 		w.WriteHeader(500)
-		w.Write([]byte(fmt.Sprintln("Cannot join host", err.Error())))
+		w.Write([]byte(fmt.Sprintln("Cannot join host", uri, err.Error())))
 	} else {
 		fmt.Printf("Resp-Headers: %v\n", resp.Header)
 
